@@ -1,0 +1,59 @@
+pipeline {
+    parameters {
+  choice choices: ['main', 'dev', 'feature1'], description: 'select the branch', name: 'Branch'
+}
+
+    environment {
+  PATH = "/opt/maven/bin:$PATH"
+}
+    agent {
+  label 'Sainath-Node'
+}
+
+    
+
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+        stage('Gitcred'){
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: "*/${Branch}"]], extensions: [], userRemoteConfigs: [[credentialsId: 'sainath\'s-mygithub', url: 'https://github.com/sainathmitalakar/hello-world-war.git']]])
+            }
+            
+            
+        }
+        stage('Build'){
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('Nexus Artifact Uploader'){
+            steps {
+                script {
+                    def mavenpom = readMavenPom file: 'pom.xml'
+                    nexusArtifactUploader artifacts: 
+                    [[artifactId: 'hello-world-war',
+                    classifier: '', 
+                    file: "target/hello-world-war-${mavenpom.version}.war", 
+                    type: 'war']], 
+                    credentialsId: 'sainath_nexus',
+                    groupId: 'com.efsavage',
+                    nexusUrl: '52.66.174.87:8081',
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    repository: 'Sainath_pipeline3',
+                    version: "${mavenpom.version}"
+                }
+                
+            }
+        }
+        stage('Deploy'){
+            steps {
+                deploy adapters: [tomcat8(credentialsId: 'sainath_tomcat', path: '', url: 'http://3.110.103.5:9090')], contextPath: 'manthan', war: '**/*.war'
+            }
+        }
+    }
+}
